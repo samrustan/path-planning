@@ -202,7 +202,7 @@ int main() {
   int lane = 1;
 
   // reference velocity to target
-  double ref_vel = 49.5; //mph
+  double ref_vel = 0; //mph
 
   h.onMessage([&ref_vel, &map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy, &lane](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
@@ -245,6 +245,61 @@ int main() {
     // TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
 
           int prev_size = previous_path_x.size();
+
+          if (prev_size > 0)
+          {
+            car_s = end_path_s;
+          }
+
+          bool too_close = false;
+
+          // find the ref_vel
+          for (int i = 0; i < sensor_fusion.size(); i++)
+          {
+            // if in-path vehicle in current lane
+            float d = sensor_fusion[i][6];
+            if (d < (2 + 4 * lane + 2) && d > (2 + 4 * lane - 2))
+            {
+              double vx = sensor_fusion[i][3];
+              double vy = sensor_fusion[i][4];
+              double check_speed = sqrt(vx * vx + vy * vy);
+              double check_car_s = sensor_fusion[i][5];
+              
+              // if using the prev path points, project s value out to where the car will
+              // be in the future
+              check_car_s += ((double)prev_size * 0.02 * check_speed);
+              
+              // check s values greater than current and s gap (of idk, 30m)
+              if ((check_car_s > car_s) && ((check_car_s - car_s) < 30))
+              {
+                // lower the ref_vel so no collision happens - tail the car
+                // also flag to change lanes and pass
+
+                //ref_vel = 29.5;
+                too_close = true;
+
+                if (lane > 0)
+                {
+                  lane = 0;
+                  
+                  // TODO: Add further logic for passing
+                }
+
+
+              }
+
+            }
+          }
+
+          if (too_close)
+          {
+            ref_vel -= 0.448;
+          }
+          else if (ref_vel < 49.5)
+          {
+            ref_vel += 0.448;
+          }
+
             
           vector<double> ptsx;
           vector<double> ptsy;
@@ -346,8 +401,6 @@ int main() {
             next_x_vals.push_back(x_point);
             next_y_vals.push_back(y_point);
           }
-
-          // TODO: finish up from video, ref video time 38:43
 
     
           json msgJson;
