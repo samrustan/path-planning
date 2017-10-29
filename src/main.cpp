@@ -241,8 +241,9 @@ int main() {
           // Sensor Fusion Data, a list of all other cars on the same side of the road.
           auto sensor_fusion = j[1]["sensor_fusion"];
 
+          // path of x,y (global) points for the car to move sequentially through every 0.02s
 
-    // TODO: determine safe to pass (lane checks)
+          // TODO: determine safe to pass (lane checks)
 
           int prev_size = previous_path_x.size();
 
@@ -257,93 +258,121 @@ int main() {
           bool safe_lane_change_left = false;
           bool safe_lane_change_right = false;
 
+          double cipv_s = 10000000; // init to large num
+          double cipv_v = 10000000; // init to large num
+
           for (int i = 0; i < sensor_fusion.size(); i++)
           {
-            double vx = sensor_fusion[i][3];
-            double vy = sensor_fusion[i][4];
-            double check_speed = sqrt(vx * vx + vy * vy);
-            double check_s = sensor_fusion[i][5];
-            double check_d = sensor_fusion[i][6];
 
+            double check_d = sensor_fusion[i][6];
             
             auto center_lane = 2 + 4 * lane;
             auto left_lane = 2 + 4 * (lane-1);
             auto right_lane = 2 + 4 * (lane + 1);
             
+            double vx = sensor_fusion[i][3];
+            double vy = sensor_fusion[i][4];
+            double check_speed = sqrt(vx * vx + vy * vy);
+            double check_s = sensor_fusion[i][5];
+
             // check center lane
             if (check_d < (center_lane + 2) && check_d > (center_lane - 2))
             {
+            
               // project s value out to where the car will be in the future
               check_s += ((double)prev_size * 0.02 * check_speed);
             
               auto cipv_dist = check_s - car_s;
 
               // check s values greater than current and s gap (of idk, 30m)
-              if ((check_s > car_s) && (cipv_dist < 30))
+              if ((check_s > car_s) && (cipv_dist < 30) && (cipv_dist < cipv_s))
               {
                 encroaching = true;
+
+                cipv_s = check_s - car_s;
+
+                if (cipv_s < 30)
+                {
+                  change_lane = true;
+                  cipv_v = check_speed * 2.237; // m/s to mph
+                }
+              }
+            }
+
+            if (change_lane)
+            {
+              if (lane != 0)
+              {
+              
+                // check the left lane
+                if (check_d < (left_lane + 2) && check_d > (left_lane - 2))
+                {
+                  // project s value out to where the car will be in the future
+                  check_s += ((double)prev_size * 0.02 * check_speed);
+
+                  // check s values greater than current and s gap (of idk, 30m)
+                  if (abs(check_s - car_s) < 20) 
+                  {
+                    safe_lane_change_left = false;
+                  }
+                  else
+                  {
+                    safe_lane_change_left = true;
+                  }
+
+                }
+              }
+            
+              else if (lane =! 2)
+              {
+                // check right lane
+                if (check_d < (right_lane + 2) && check_d > (right_lane - 2))
+                {
+                  // project s value out to where the car will be in the future
+                  check_s += ((double)prev_size * 0.02 * check_speed);
+
+                  // check s values greater than current and s gap (of idk, 30m)
+                  if (abs(check_s - car_s) < 20) 
+                  {
+                    safe_lane_change_right = false;
+                  }
+                  else
+                  {
+                    safe_lane_change_right = true;
+                  }
+                }
               }
 
-            }
-            
-            // check the left lane
-            if (check_d < (left_lane + 2) && check_d > (left_lane - 2))
-            {
-              // project s value out to where the car will be in the future
-              check_s += ((double)prev_size * 0.02 * check_speed);
+              cout << "\nchange lane";
 
-              // check s values greater than current and s gap (of idk, 30m)
-              if (abs(check_s - car_s) < 15) 
+              if (lane != 0 && safe_lane_change_left)
               {
-                safe_lane_change_left = false;
+                lane -= 1;
+                cout << "left" << endl;
+              }
+              else if (lane != 2 && safe_lane_change_right)
+              {
+                lane += 1;
+                cout << "right" << endl;
               }
               else
               {
-                safe_lane_change_left = true;
+                if (cipv_v -1 < ref_vel && ref_vel < cipv_v + 1)
+                {
+                  ref_vel = cipv_v;
+                }
+                else if (cipv_v < ref_vel)
+                {
+                  ref_vel -= 0.448;
+                }
               }
-
             }
-            
-            // check right lane
-            if (check_d < (right_lane + 2) && check_d > (right_lane - 2))
+            else if (ref_vel < 49.5)
             {
-              // project s value out to where the car will be in the future
-              check_s += ((double)prev_size * 0.02 * check_speed);
-
-              // check s values greater than current and s gap (of idk, 30m)
-              if (abs(check_s - car_s) < 15) 
-              {
-                safe_lane_change_right = false;
-              }
-              else
-              {
-                safe_lane_change_right = true;
-              }
-
+              ref_vel += 0.448;
             }
-            
-            
-          }
-
-          if (encroaching && safe_lane_change_left)
-          {
-           
-            lane = lane - 1;
-            ref_vel -= 0.448;
-            
-          }
-          else if (encroaching && safe_lane_change_right)
-          {
-          
-            lane = lane + 1;
-            ref_vel -= 0.448;
 
           }
-          else if (ref_vel < 49.5)
-          {
-            ref_vel += 0.448;
-          }
-          
 
 
           vector<double> ptsx;
