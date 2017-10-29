@@ -198,7 +198,7 @@ int main() {
     map_waypoints_dy.push_back(d_y);
   }
 
-  // start in lane 1
+  // start in lane 1 - this is the default start lane for the simulator
   int lane = 1;
 
   // reference velocity to target
@@ -242,7 +242,7 @@ int main() {
           auto sensor_fusion = j[1]["sensor_fusion"];
 
 
-    // TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
+    // TODO: determine safe to pass (lane checks)
 
           int prev_size = previous_path_x.size();
 
@@ -251,56 +251,100 @@ int main() {
             car_s = end_path_s;
           }
 
-          bool too_close = false;
+          bool encroaching = false;
+          bool check_lane = false;
+          bool change_lane = false;
+          bool safe_lane_change_left = false;
 
           // find the ref_vel
           for (int i = 0; i < sensor_fusion.size(); i++)
           {
-            // if in-path vehicle in current lane
-            float d = sensor_fusion[i][6];
+            double vx = sensor_fusion[i][3];
+            double vy = sensor_fusion[i][4];
+            double check_speed = sqrt(vx * vx + vy * vy);
+            double check_car_s = sensor_fusion[i][5];
+          
+            // for in-path vehicle in current lane
+            auto d = sensor_fusion[i][6];
             if (d < (2 + 4 * lane + 2) && d > (2 + 4 * lane - 2))
             {
-              double vx = sensor_fusion[i][3];
-              double vy = sensor_fusion[i][4];
-              double check_speed = sqrt(vx * vx + vy * vy);
-              double check_car_s = sensor_fusion[i][5];
-              
-              // if using the prev path points, project s value out to where the car will
-              // be in the future
+              // project s value out to where the car will be in the future
               check_car_s += ((double)prev_size * 0.02 * check_speed);
-              
+
               // check s values greater than current and s gap (of idk, 30m)
               if ((check_car_s > car_s) && ((check_car_s - car_s) < 30))
               {
-                // lower the ref_vel so no collision happens - tail the car
-                // also flag to change lanes and pass
+                encroaching = true;
+                check_lane = true;
+                
+                cout << "encroaching on IPV" << endl;
+                
+                auto cipv_dist = check_car_s - car_s;
 
-                //ref_vel = 29.5;
-                too_close = true;
-
-                if (lane > 0)
-                {
-                  lane = 0;
-                  
-                  // TODO: Add further logic for passing
-                }
-
+                cout << "CIPV: " << cipv_dist << endl;
 
               }
-
             }
+            // for vehicle in left lane
+            if (d < (2 + 4 * (lane-1) + 2) && d > (2 + 4 * (lane-1) - 2))
+            {
+              check_car_s += ((double)prev_size * 0.02 * check_speed);
+              auto copv_left = check_car_s - car_s;
+
+              if (abs(copv_left) < 20)
+              {
+                cout << "left: NO" << endl;
+                safe_lane_change_left = false;
+              }
+              else
+              {
+                cout << "PASS on left" << endl;
+                safe_lane_change_left = true;
+                if (encroaching && lane > 0)
+                {
+                  lane = lane - 1;
+                }
+
+              }
+            }
+
+            // for vehicle in right lane
+            if (d < (2 + 4 * (lane+1) + 2) && d > (2 + 4 * (lane+1) - 2))
+            {
+              check_car_s += ((double)prev_size * 0.02 * check_speed);
+              auto copv_right = check_car_s - car_s;
+
+              if (abs(copv_right) < 20)
+              {
+                cout << "right: NO" << endl;
+                safe_lane_change_left = false;
+              }
+              else
+              {
+                cout << "PASS on right" << endl;
+                safe_lane_change_left = true;
+                if (encroaching)
+                {
+                  lane = lane + 1;
+                }
+
+              }
+            }
+             
           }
 
-          if (too_close)
+          if (encroaching)
           {
+            
             ref_vel -= 0.448;
+            
           }
           else if (ref_vel < 49.5)
           {
             ref_vel += 0.448;
           }
 
-            
+
           vector<double> ptsx;
           vector<double> ptsy;
 
