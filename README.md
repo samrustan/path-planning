@@ -1,6 +1,25 @@
 # CarND-Path-Planning-Project
 Self-Driving Car Engineer Nanodegree Program
-   
+
+### Write-up - Reflection
+
+This implementation of a path planner uses waypoints from map data, the Frenet cooridinate system, and a very basic finite-state-machine to perform lane changing and adaptive cruise control.  It relies heavily on the spline.h library for interpolation, and while it meets the requirements for this project, its not likely that this would be sufficient for real world driving.
+
+The simulated self-driving vehicle uses waypoints generated from map data.  These map points are used in the Frenet coordinate system.  Effectively, this allows for a curvilinear coordinate system, in other words, it uses the longitude and latitude of the roadway to determine its position on the roadway.  The Frenet coordinate system make it easy to calculate relative position from other cars on the road.  This makes the complicated nature of the logic required for lane changing much simpler to compute.
+
+The planner relies on the previous path waypoints and maintains the end-point of the path for continuity of the projected path.  Initially, the current position of the car is used.  From here, the points tangential to the car are calculated.  This follows directly from the classroom overview of the project.  The path contains 50 points and is continually maintained at 50 by adding only the points that are required to make up the difference.  This is important for the previously mentioned continuity of the path.  The spacing of the points is based on the desired speed, this will be dependant on the state of the ACC.
+
+The design of the lane change logic was iterated over many times as several approaches and state-machines were attempted.  The submitted design, though a bit crude, is effectively a rather straight-forward, simplistic (but effective) approach.  Basically if the current in-path vehicle (CIPV) is too slow, then the other lanes are checked.  If there are no cars within 22m, then a lane change is performed.  The lane change logic is simply to "assign" a new lane id and then feed this to the calculations that use the spline to smoothly make the lane change.
+
+Overall this was a challenging project, as I attempted to make a highly robust path-planner.  I realized from multiple attempts that while a certain implementation may go without issue for even a few miles on the track, there are certain situations that end up in an apparent indecision on lane changing, which resulted in collisions or simply flagged for sitting between lanes for too long.  
+
+The video of the qualifying run is available here: https://youtu.be/xGSKIgMvFkM
+
+The submitted video is for 4.5 miles without incident, however I let it run for a while and was able to get about 14-15 miles without incident.
+
+<img src="path-planner-lane-change.png" width="400" height="300" />
+<img src="path_planning-14miles.png"  width="400" height="300" />
+
 ### Simulator.
 You can download the Term3 Simulator which contains the Path Planning Project from the [releases tab (https://github.com/udacity/self-driving-car-sim/releases).
 
